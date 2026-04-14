@@ -1,0 +1,22 @@
+// backend/properties.jsw
+import wixData from "wix-data";
+import wixUsersBackend from "wix-users-backend";
+
+const COLLECTION = "Properties";
+
+export async function getMyProperties({ limit = 100 } = {}) {
+  const user = wixUsersBackend.currentUser;
+
+  if (!user.loggedIn) {
+    return { ok: false, status: 401, items: [], message: "Not logged in" };
+  }
+
+  const res = await wixData
+    .query(COLLECTION)
+    .eq("_owner", user.id)
+    .descending("_createdDate")
+    .limit(Math.min(200, Number(limit) || 100))
+    .find({ suppressAuth: true });
+
+  return { ok: true, status: 200, items: res.items || [] };
+}

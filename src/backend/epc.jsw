@@ -1,0 +1,7 @@
+// backend/epc.jsw
+// Stable backend API for front-end pages.
+// Re-exports functions from epc.web.js so your imports are consistent.
+
+import { getDomesticEpcCandidates, getLatestDomesticEpc } from "backend/epc.web";
+
+export { getDomesticEpcCandidates, getLatestDomesticEpc };
