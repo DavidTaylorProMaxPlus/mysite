@@ -39,9 +39,7 @@ function initialiseUi() {
     clearFormMessage();
 
     collapseIfPossible(IDS.helpBox);
-
-    // Always show this section on Property Inspections
-    showAdditionalInspectionBox();
+    hideAdditionalInspectionBox();
     updateInspectionUI();
 
     console.log("Initial IDs check:", {
@@ -137,8 +135,15 @@ function wireInspectionLogic() {
 }
 
 function updateInspectionUI() {
-    console.log("updateInspectionUI()");
-    showAdditionalInspectionBox();
+    const inspectionType = getValue(IDS.radioInspectionType);
+    console.log("updateInspectionUI()", { inspectionType });
+
+    if (inspectionType) {
+        showAdditionalInspectionBox();
+    } else {
+        hideAdditionalInspectionBox();
+        clearInspectionDateField();
+    }
 }
 
 function showAdditionalInspectionBox() {
@@ -174,15 +179,13 @@ function wireContinueButton() {
         const tenant = getValue(IDS.radioTenant);
         const inspectionType = getValue(IDS.radioInspectionType);
         const concern = getValue(IDS.radioConcern);
-        const inspectionDateInfo = getInspectionDateInfo();
 
         console.log("Collected values:", {
             intent,
             depth,
             tenant,
             inspectionType,
-            concern,
-            inspectionDateInfo
+            concern
         });
 
         if (!intent || !depth || !tenant || !inspectionType || !concern) {
@@ -199,10 +202,6 @@ function wireContinueButton() {
             session.setItem("isTenanted", String(tenant || ""));
             session.setItem("inspectionType", String(inspectionType || ""));
             session.setItem("inspectionConcern", String(concern || ""));
-
-            session.setItem("inspectionDateRaw", inspectionDateInfo.raw || "");
-            session.setItem("inspectionDateDisplay", inspectionDateInfo.display || "");
-            session.setItem("inspectionDateISO", inspectionDateInfo.iso || "");
 
             console.log("Session saved successfully");
         } catch (err) {

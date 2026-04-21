@@ -3,6 +3,7 @@ import { getLatestDomesticEpc } from "backend/epc";
 import { lookupPostcode } from "backend/postcodes.web";
 import wixData from "wix-data";
 import wixLocation from "wix-location";
+import { session } from "wix-storage";
 
 const COLLECTION = "Properties";
 const EPC_FRESH_DAYS = 30;
@@ -128,6 +129,10 @@ const QUESTION_FLOW = ["gasSafety", "electrical", "smokeAlarm", "coAlarm", "depo
 
 function safeUpper(val) {
   return String(val || "").trim().toUpperCase();
+}
+
+function safeLower(val) {
+  return String(val || "").trim().toLowerCase();
 }
 
 function cleanAddressHint(raw) {
@@ -525,7 +530,17 @@ function humanisePrimaryIntent(value) {
     check_epc: "Check EPC compliance",
     improve_epc: "Improve EPC rating",
     full_check: "Full compliance check",
-    check_compliance_first: "Check compliance first"
+    check_compliance_first: "Check compliance first",
+    book_gas_safety: "Book a gas safety check",
+    check_gas_safety: "Check gas safety compliance",
+    book_eicr: "Book an EICR",
+    check_eicr: "Check electrical compliance",
+    book_inspection: "Book a property inspection",
+    check_property_condition: "Check property condition",
+    check_aml: "Run AML checks",
+    sort_tax: "Sort Making Tax Digital requirements",
+    seek_possession: "Prepare for possession",
+    understand_eviction_position: "Understand eviction position"
   };
 
   return map[v] || (value ? String(value) : "");
@@ -546,16 +561,107 @@ function humaniseService(value) {
 
   const map = {
     epc: "EPC",
+    epcs: "EPC",
     evictions: "Evictions & Possession",
+    "evictions-and-possession": "Evictions & Possession",
     gas: "Gas Safety",
     gas_safety: "Gas Safety",
+    "gas-safety": "Gas Safety",
     eicr: "EICR",
+    "eicr-checks": "EICR",
     aml: "AML Checks",
+    amlchecks: "AML Checks",
+    "aml-checks": "AML Checks",
     inspections: "Property Inspections",
-    making_tax_digital: "Making Tax Digital"
+    propertyinspections: "Property Inspections",
+    "property-inspections": "Property Inspections",
+    making_tax_digital: "Making Tax Digital",
+    makingtaxdigital: "Making Tax Digital",
+    "making-tax-digital": "Making Tax Digital"
   };
 
   return map[v] || (value ? String(value) : "");
+}
+
+function humaniseInspectionType(value) {
+  const v = safeLower(value);
+
+  const map = {
+    routine: "Routine inspection",
+    routine_inspection: "Routine inspection",
+    pre_tenancy: "Pre-tenancy / move-in check",
+    pre_tenancy_move_in: "Pre-tenancy / move-in check",
+    mid_tenancy: "Mid-tenancy inspection",
+    end_of_tenancy: "End-of-tenancy / condition check"
+  };
+
+  return map[v] || (value ? String(value) : "");
+}
+
+function humaniseInspectionConcern(value) {
+  const v = safeLower(value);
+
+  const map = {
+    general_condition: "General condition and upkeep",
+    damage_cleanliness_neglect: "Damage, cleanliness, or neglect",
+    safety_maintenance: "Safety or maintenance concerns",
+    peace_of_mind: "I just want peace of mind"
+  };
+
+  return map[v] || (value ? String(value) : "");
+}
+
+function humaniseJourneyDepth(value) {
+  const v = safeLower(value);
+
+  const map = {
+    quick_check: "Quick check",
+    full_support: "Full support",
+    guidance_only: "Guidance only",
+    book_service: "Book a service"
+  };
+
+  return map[v] || (value ? String(value) : "");
+}
+
+function getJourneyContext(item) {
+  const itemPriorityModule = String(item?.priorityModule || "").trim();
+  const itemSourceServicePage = String(item?.sourceServicePage || "").trim();
+  const itemPrimaryIntent = String(item?.primaryIntent || "").trim();
+  const itemJourneyDepth = String(item?.journeyDepth || "").trim();
+  const itemIsTenanted = String(item?.isTenanted || "").trim();
+  const itemEvictionContext = String(item?.evictionContext || "").trim();
+  const itemInspectionType = String(item?.inspectionType || "").trim();
+  const itemInspectionConcern = String(item?.inspectionConcern || "").trim();
+
+  const sessionPriorityModule = String(session.getItem("priorityModule") || "").trim();
+  const sessionSourceServicePage = String(session.getItem("sourceServicePage") || "").trim();
+  const sessionPrimaryIntent = String(session.getItem("primaryIntent") || "").trim();
+  const sessionJourneyDepth = String(session.getItem("journeyDepth") || "").trim();
+  const sessionIsTenanted = String(session.getItem("isTenanted") || "").trim();
+  const sessionEvictionContext = String(session.getItem("evictionContext") || "").trim();
+  const sessionInspectionType = String(session.getItem("inspectionType") || "").trim();
+  const sessionInspectionConcern = String(session.getItem("inspectionConcern") || "").trim();
+
+  const sourceServicePage = sessionSourceServicePage || itemSourceServicePage;
+  const priorityModule = sessionPriorityModule || itemPriorityModule;
+  const primaryIntent = sessionPrimaryIntent || itemPrimaryIntent;
+  const journeyDepth = sessionJourneyDepth || itemJourneyDepth;
+  const isTenanted = sessionIsTenanted || itemIsTenanted;
+  const evictionContext = sessionEvictionContext || itemEvictionContext;
+  const inspectionType = sessionInspectionType || itemInspectionType;
+  const inspectionConcern = sessionInspectionConcern || itemInspectionConcern;
+
+  return {
+    sourceServicePage,
+    priorityModule,
+    primaryIntent,
+    journeyDepth,
+    isTenanted,
+    evictionContext,
+    inspectionType,
+    inspectionConcern
+  };
 }
 
 function renderJourneySummary(item) {
@@ -568,18 +674,25 @@ function renderJourneySummary(item) {
     return;
   }
 
-  const priorityModule = String(item?.priorityModule || "").trim().toLowerCase();
-  const sourceServicePage = humaniseService(item?.sourceServicePage);
-  const primaryIntent = humanisePrimaryIntent(item?.primaryIntent);
-  const isTenanted = humaniseYesNoMaybe(item?.isTenanted);
-  const evictionContext = humaniseYesNoMaybe(item?.evictionContext);
+  const journey = getJourneyContext(item);
+  const priorityModule = safeLower(journey.priorityModule);
+  const sourceServicePage = humaniseService(journey.sourceServicePage);
+  const primaryIntent = humanisePrimaryIntent(journey.primaryIntent);
+  const journeyDepth = humaniseJourneyDepth(journey.journeyDepth);
+  const isTenanted = humaniseYesNoMaybe(journey.isTenanted);
+  const evictionContext = humaniseYesNoMaybe(journey.evictionContext);
+  const inspectionType = humaniseInspectionType(journey.inspectionType);
+  const inspectionConcern = humaniseInspectionConcern(journey.inspectionConcern);
 
   const lines = [];
 
   if (sourceServicePage) lines.push(`Started from: ${sourceServicePage}`);
   if (primaryIntent) lines.push(`Reason for enquiry: ${primaryIntent}`);
+  if (journeyDepth) lines.push(`Support level: ${journeyDepth}`);
   if (isTenanted) lines.push(`Property currently tenanted: ${isTenanted}`);
   if (evictionContext) lines.push(`Possession/eviction concern: ${evictionContext}`);
+  if (inspectionType) lines.push(`Inspection type: ${inspectionType}`);
+  if (inspectionConcern) lines.push(`Main concern: ${inspectionConcern}`);
 
   if (!lines.length) {
     hide(JOURNEY_UI.journeySummarySection);
@@ -597,25 +710,28 @@ function renderJourneySummary(item) {
 }
 
 function applyPriorityLayout(item) {
-  const priority = String(item?.priorityModule || "").trim().toLowerCase();
-  const primaryIntent = String(item?.primaryIntent || "").trim().toLowerCase();
-  const isTenanted = String(item?.isTenanted || "").trim().toLowerCase();
-  const evictionContext = String(item?.evictionContext || "").trim().toLowerCase();
+  const journey = getJourneyContext(item);
+
+  const priority = safeLower(journey.priorityModule);
+  const primaryIntent = safeLower(journey.primaryIntent);
+  const isTenanted = safeLower(journey.isTenanted);
+  const evictionContext = safeLower(journey.evictionContext);
+  const source = safeLower(journey.sourceServicePage);
+  const inspectionType = safeLower(journey.inspectionType);
 
   console.log("🎯 Applying priority layout:", {
     priority,
+    source,
     primaryIntent,
     isTenanted,
-    evictionContext
+    evictionContext,
+    inspectionType
   });
 
   show(JOURNEY_UI.epcPrioritySection);
   show(JOURNEY_UI.generalComplianceSection);
 
-  if (priority === "epc") {
-    show(JOURNEY_UI.epcPrioritySection);
-    show(JOURNEY_UI.generalComplianceSection);
-
+  if (priority === "epc" || source === "epcs" || source === "epc") {
     let intro = "We’ve prioritised your EPC details first so you can deal with the main thing you came for.";
 
     if (primaryIntent === "book_epc") {
@@ -639,10 +755,57 @@ function applyPriorityLayout(item) {
     return;
   }
 
-  if (priority === "eviction") {
+  if (priority === "gasafety" || priority === "gassafety" || source === "gas-safety" || source === "gas_safety") {
+    setJourneyIntro(
+      "We’ve prioritised your gas safety journey first so you can quickly see whether the property looks covered, what date matters, and what still needs attention."
+    );
+    renderJourneySummary(item);
+    return;
+  }
+
+  if (priority === "eicr" || source === "eicr-checks") {
+    setJourneyIntro(
+      "We’ve prioritised your electrical safety journey first so you can check the current EICR position before working through the wider compliance steps."
+    );
+    renderJourneySummary(item);
+    return;
+  }
+
+  if (priority === "propertyinspections" || priority === "propertyinspection" || source === "property-inspections") {
+    let intro =
+      "We’ve prioritised your property inspections journey first so you can start from the kind of inspection you need and the main concern you’re trying to stay on top of.";
+
+    if (inspectionType) {
+      intro += " We’ve carried that inspection route into this property so the next steps feel more tailored.";
+    }
+
+    setJourneyIntro(intro);
+    renderJourneySummary(item);
+    return;
+  }
+
+  if (priority === "amlchecks" || priority === "aml" || source === "aml-checks") {
+    setJourneyIntro(
+      "We’ve prioritised your AML journey first so you can capture the right property details while keeping the wider compliance picture in view."
+    );
+    renderJourneySummary(item);
+    return;
+  }
+
+  if (priority === "makingtaxdigital" || priority === "making_tax_digital" || source === "making-tax-digital") {
+    setJourneyIntro(
+      "We’ve prioritised your Making Tax Digital journey first so you can get the property details organised around the tax-related task you started with."
+    );
+    renderJourneySummary(item);
+    return;
+  }
+
+  if (priority === "eviction" || source === "evictions-and-possession" || source === "evictions") {
     show(JOURNEY_UI.generalComplianceSection);
     show(JOURNEY_UI.epcPrioritySection);
-    setJourneyIntro("We’ve prioritised the wider compliance checks first because possession-readiness matters for this property.");
+    setJourneyIntro(
+      "We’ve prioritised the wider compliance checks first because possession-readiness matters for this property."
+    );
     renderJourneySummary(item);
     return;
   }
@@ -1754,9 +1917,10 @@ $w.onReady(() => {
     const item = dataset.getCurrentItem();
     if (!item) return;
 
-applyPriorityLayout(item);
+    applyPriorityLayout(item);
 
-console.log("Loaded item:", item);
+    console.log("Loaded item:", item);
+    console.log("Journey context:", getJourneyContext(item));
     console.log("epcRaw keys:", Object.keys(getEpcRaw(item) || {}));
 
     wireNavAndDelete(dataset, item._id);
@@ -1916,9 +2080,4 @@ console.log("Loaded item:", item);
       epcCurrentRating: d.currentEnergyRating || item.epcCurrentRating,
       epcCurrentScore: toNumberMaybe(d.currentEnergyEfficiency),
       epcPotentialRating: d.potentialEnergyRating || item.epcPotentialRating,
-      epcPotentialScore: toNumberMaybe(d.potentialEnergyEfficiency),
-      epcExpiryDate: parseDateMaybe(d.expiryDate) || item.epcExpiryDate,
-      epcRaw: d
-    });
-  });
-});
+      epcPotentialScore: toNumberMaybe(d.potentialEnergy
